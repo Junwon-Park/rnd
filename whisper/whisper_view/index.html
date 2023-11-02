@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>음성 녹음 및 전송</title>
+    <style>
+        #recordButton, #playButton {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+
+        #stopButton {
+            background-color: #f44336;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<h1>음성 녹음 및 전송</h1>
+<button id="recordButton">녹음</button>
+<button id="stopButton">종료</button>
+<button id="playButton">재생</button>
+<div id="response"></div>
+
+<script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
+<audio id="audio" controls style="display: none;"></audio>
+<script>
+    let recorder;
+    const recordButton = document.getElementById('recordButton');
+    const stopButton = document.getElementById('stopButton');
+    const playButton = document.getElementById('playButton');
+    const responseDiv = document.getElementById('response');
+    const audio = document.getElementById('audio');
+
+    recordButton.addEventListener('click', startRecording);
+    stopButton.addEventListener('click', stopRecording);
+    playButton.addEventListener('click', playRecording);
+
+    function startRecording() {
+        recordButton.style.display = 'none';
+        stopButton.style.display = 'inline-block';
+        playButton.style.display = 'none';
+
+        const mediaConstraints = {
+            audio: true
+        };
+
+        navigator.mediaDevices.getUserMedia(mediaConstraints)
+            .then(function (stream) {
+                recorder = new RecordRTC(stream, {
+                    type: 'audio',
+                    mimeType: 'audio/mpeg'
+                });
+                recorder.startRecording();
+            })
+            .catch(function (error) {
+                console.error('오디오 녹음을 시작할 수 없습니다: ', error);
+            });
+    }
+
+    function stopRecording() {
+        recordButton.style.display = 'inline-block';
+        stopButton.style.display = 'none';
+        playButton.style.display = 'inline-block';
+
+        recorder.stopRecording(function () {
+            const blob = recorder.getBlob();
+            saveAudioLocally(blob, 'recorded.mp3');
+            uploadAudio(blob);
+        });
+    }
+
+    function saveAudioLocally(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        audio.src = url;
+        audio.style.display = 'block';
+        audio.controls = true;
+    }
+
+    function playRecording() {
+        if (audio.src) {
+            audio.play();
+        }
+    }
+
+    function uploadAudio(blob) {
+        const formData = new FormData();
+        formData.append('audio', blob, 'recorded.mp3');
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://localhost:8000', true);
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                responseDiv.innerHTML = '서버 응답: ' + xhr.responseText;
+                console.log(xhr.responseText);
+            } else {
+                responseDiv.innerHTML = '서버로 파일 전송 중 오류가 발생했습니다.';
+            }
+        };
+        xhr.send(formData);
+    }
+</script>
+</body>
+</html>
